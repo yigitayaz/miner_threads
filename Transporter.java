@@ -1,4 +1,4 @@
-public class Transporter {
+public class Transporter implements Runnable{
     private int ID;
     private int travelTime;
     private int minerID;
@@ -11,5 +11,11 @@ public class Transporter {
         this.minerID = minerID;
         this.sourceSmelterID = sourceSmelterID;
         this.targetSmelterID = targetSmelterID;
+
+    }
+
+    @Override
+    public void run() {
+
     }
 }

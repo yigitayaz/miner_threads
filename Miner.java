@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.DoubleSummaryStatistics;
 import java.util.Random;
 import java.util.concurrent.locks.Condition;
@@ -6,6 +7,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.DoubleStream;
 
 public class Miner implements Runnable{
+
+    private static final ArrayList<Miner> instances = new ArrayList<Miner>();
+
     private final int  ID;
     private final int  interval;
     private final int capacity;
@@ -78,6 +82,13 @@ public class Miner implements Runnable{
 
     }
     private void MinerStopped(){
+
+    }
+    public static Miner getInstance(int ID){
+        return instances.get(ID-1);
+    }
+    public static void addInstance(Miner miner){
+        instances.add(miner);
 
     }
 }

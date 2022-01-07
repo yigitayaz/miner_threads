@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -5,6 +6,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.DoubleStream;
 
 public class Constructor implements Runnable{
+
+    private static final ArrayList<Constructor> instances = new ArrayList<Constructor>();
+
     private final HW2Logger logger;
     private final int ID;
     private final int interval;
@@ -13,7 +17,7 @@ public class Constructor implements Runnable{
     private int counter;
 
     private final Lock lock;
-    private final Condition isArrived;
+    private final Condition didNotArrive;
 
     public Constructor(int ID, int interval, int capacity, int ingotType, HW2Logger logger) {
         this.ID = ID;
@@ -22,7 +26,7 @@ public class Constructor implements Runnable{
         this.ingotType = ingotType;
         this.logger = logger;
         lock = new ReentrantLock();
-        isArrived = lock.newCondition();
+        didNotArrive = lock.newCondition();
         counter =0;
 
     }
@@ -53,14 +57,32 @@ public class Constructor implements Runnable{
     private void WaitCanProduce(){
         lock.lock();
         try{
-
+            if(ingotType ==1){
+                while(counter < 1){
+                    didNotArrive.await();
+                }
+            }
+            else{
+                while(counter < 2)
+                    didNotArrive.await();
+            }
         }
         catch (InterruptedException e){
             e.printStackTrace();
         }
-        finally
+        finally{
+            lock.unlock();
+        }
     }
     private void ConstructorProduced(){
 
     }
+    public static Constructor getInstance(int ID){
+        return instances.get(ID-1);
+    }
+    public static void addInstance(Constructor constructor){
+        instances.add(constructor);
+
+    }
+
 }

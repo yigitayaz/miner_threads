@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -5,6 +6,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.DoubleStream;
 
 public class Smelter implements Runnable{
+
+    private static final ArrayList<Smelter> instances = new ArrayList<Smelter>();
+
     private final int ID;
     private final int interval;
     private final int iCapacity;
@@ -15,7 +19,7 @@ public class Smelter implements Runnable{
     HW2Logger logger;
 
     private final Lock lock;
-    private final Condition isArrived;
+    private final Condition didNotArrive;
     private final Condition isFull;
     private final Condition isEmpty;
 
@@ -29,7 +33,7 @@ public class Smelter implements Runnable{
         this.ingotCounter = 0;
         this.logger = logger;
         lock = new ReentrantLock();
-        isArrived = lock.newCondition();
+        didNotArrive = lock.newCondition();
         isFull = lock.newCondition();
         isEmpty = lock.newCondition();
     }
@@ -63,13 +67,13 @@ public class Smelter implements Runnable{
         try{
             if(ingotType ==0){
                 while(oreCounter <1){
-                    isArrived.await();
+                    didNotArrive.await();
                 }
 
             }
             else if(ingotType == 1){
                 while(oreCounter<2){
-                    isArrived.await();
+                    didNotArrive.await();
                 }
             }
         }
@@ -86,6 +90,13 @@ public class Smelter implements Runnable{
 
     }
     private void SmelterStopped(){
+
+    }
+    public static Smelter getInstance(int ID){
+        return instances.get(ID-1);
+    }
+    public static void addInstance(Smelter smelter){
+        instances.add(smelter);
 
     }
 

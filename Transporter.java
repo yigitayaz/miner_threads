@@ -1,4 +1,6 @@
 import java.util.Random;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
 import java.util.stream.DoubleStream;
 
 public class Transporter implements Runnable{
@@ -92,15 +94,114 @@ public class Transporter implements Runnable{
         }
     }
     private void WaitNextLoad(){
+        if(minerID != 0){
+            Miner miner = Miner.getInstance(minerID);
+            Lock lock = miner.getLock();
+            Condition isEmpty = miner.getIsEmpty();
 
+            try{
+                lock.lock();
+                int counter = miner.getCounter();
+                while(counter  == 0){
+                    isEmpty.await();
+                }
+            }
+            catch (InterruptedException e){
+                e.printStackTrace();
+
+            }
+            finally{
+                miner.incrementCounter(-1);
+                lock.unlock();
+            }
+        }
+        else{
+            Smelter smelter = Smelter.getInstance(sourceSmelterID);
+            Lock lock = smelter.getLock();
+            Condition isEmpty = smelter.getIsEmpty();
+            try{
+                lock.lock();
+                int counter = smelter.getIngotCounter();
+                while(counter == 0){
+                    isEmpty.await();
+                }
+            }
+            catch (InterruptedException e){
+                e.printStackTrace();
+
+            }
+            finally{
+                smelter.incrementIngotCounter(-1);
+                lock.unlock();
+            }
+
+        }
     }
     private void WaitUnLoad(){
+        if(targetConstructorID != 0){
+            Constructor constructor = Constructor.getInstance(minerID);
+            Lock lock = constructor.getLock();
+            Condition isFull = constructor.getisFull();
 
+            try{
+                lock.lock();
+                int counter = constructor.getCounter();
+                int capacity = constructor.getCapacity();
+                while(counter >= capacity){
+                    isFull.await();
+                }
+            }
+            catch (InterruptedException e){
+                e.printStackTrace();
+
+            }
+            finally{
+                constructor.incrementCounter(1);
+                lock.unlock();
+            }
+        }
+        else{
+            Smelter smelter = Smelter.getInstance(targetSmelterID);
+            Lock lock = smelter.getLock();
+            Condition isFull = smelter.getIsFull();
+            try{
+                lock.lock();
+                int counter = smelter.getIngotCounter();
+                int capacity = smelter.getOreCapacity();
+                while(counter>= capacity ){
+                    isFull.await();
+                }
+            }
+            catch (InterruptedException e){
+                e.printStackTrace();
+
+            }
+            finally{
+                smelter.incrementOreCounter(1);
+                lock.unlock();
+            }
+
+        }
     }
     private void Loaded(){
-
+        if(minerID !=0){
+            Miner miner = Miner.getInstance(minerID);
+            miner.getIsFull().signal();
+        }
+        else{
+            // Buraya bakicam
+            Smelter smelter = Smelter.getInstance(sourceSmelterID);
+            smelter.getIsFull().signal();
+        }
     }
     private void Unloaded(){
-
+        if(targetSmelterID !=0){
+            Smelter smelter = Smelter.getInstance(targetSmelterID);
+            smelter.getIsFull().signal();
+        }
+        else{
+            Constructor constructor = Constructor.getInstance(targetConstructorID);
+            constructor.getisFull().signal();
+        }
     }
 }

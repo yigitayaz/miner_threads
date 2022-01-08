@@ -17,7 +17,7 @@ public class Constructor implements Runnable{
     private int counter;
 
     private final Lock lock;
-    private final Condition didNotArrive;
+    private final Condition didNotArrive,isFull;
 
     public Constructor(int ID, int interval, int capacity, int ingotType, HW2Logger logger) {
         this.ID = ID;
@@ -27,6 +27,7 @@ public class Constructor implements Runnable{
         this.logger = logger;
         lock = new ReentrantLock();
         didNotArrive = lock.newCondition();
+        isFull = lock.newCondition();
         counter =0;
 
     }
@@ -83,6 +84,22 @@ public class Constructor implements Runnable{
     public static void addInstance(Constructor constructor){
         instances.add(constructor);
 
+    }
+    public Lock getLock(){
+        return lock;
+
+    }
+    public Condition getisFull(){
+        return isFull;
+    }
+    public int getCounter(){
+        return counter;
+    }
+    public void incrementCounter(int amount){
+        counter += amount;
+    }
+    public int getCapacity(){
+        return capacity;
     }
 
 }

@@ -99,5 +99,28 @@ public class Smelter implements Runnable{
         instances.add(smelter);
 
     }
-
+    public Lock getLock(){
+        return lock;
+    }
+    public Condition getIsEmpty(){
+        return isEmpty;
+    }
+    public Condition getIsFull(){
+        return isFull;
+    }
+    public int getOreCounter(){
+        return oreCounter;
+    }
+    public void incrementOreCounter(int amount){
+        oreCounter += amount;
+    }
+    public int getIngotCounter(){
+        return ingotCounter;
+    }
+    public void incrementIngotCounter(int amount){
+        ingotCounter += amount;
+    }
+    public int getOreCapacity(){
+        return oCapacity;
+    }
 }

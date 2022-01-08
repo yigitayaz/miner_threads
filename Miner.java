@@ -74,12 +74,23 @@ public class Miner implements Runnable{
 
         }
         finally {
+            counter++;
             lock.unlock();
         }
 
     }
     private void OreProduced(){
-
+        try{
+            while(counter ==0){
+                isEmpty.await();
+            }
+        }
+        catch(InterruptedException e){
+            e.printStackTrace();
+        }
+        finally{
+            isEmpty.signalAll();
+        }
     }
     private void MinerStopped(){
 
@@ -91,4 +102,20 @@ public class Miner implements Runnable{
         instances.add(miner);
 
     }
+    public int getCounter(){
+        return counter;
+    }
+    public void incrementCounter(int i){
+        counter +=i;
+    }
+    public Lock getLock(){
+        return lock;
+    }
+    public Condition getIsEmpty(){
+        return isEmpty;
+    }
+    public Condition getIsFull(){
+        return isFull;
+    }
+
 }

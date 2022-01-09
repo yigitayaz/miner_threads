@@ -5,19 +5,14 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.DoubleStream;
 
-public class Constructor implements Runnable{
+public class Constructor extends Agent{
 
     private static final ArrayList<Constructor> instances = new ArrayList<Constructor>();
-
-    private final HW2Logger logger;
     private final int ID;
-    private final int interval;
     private final int capacity;
     private final int ingotType;
-    private int counter;
 
-    private final Lock lock;
-    private final Condition didNotArrive,isFull;
+    private final Condition canProduce,isFull;
 
     public Constructor(int ID, int interval, int capacity, int ingotType, HW2Logger logger) {
         this.ID = ID;
@@ -26,16 +21,16 @@ public class Constructor implements Runnable{
         this.ingotType = ingotType;
         this.logger = logger;
         lock = new ReentrantLock();
-        didNotArrive = lock.newCondition();
+        canProduce = lock.newCondition();
         isFull = lock.newCondition();
         counter =0;
-
+        isDead = false;
     }
 
     @Override
     public void run() {
         logger.Log(0,0,0,ID,Action.CONSTRUCTOR_CREATED);
-        while(/*there are actuve trabsportes abd ores in the incomung storage*/){
+        while(checkRawCount() || activeTransporters()){
             WaitCanProduce();
             logger.Log(0,0,0,ID,Action.CONSTRUCTOR_STARTED);
             sleep();
@@ -44,28 +39,18 @@ public class Constructor implements Runnable{
         }
         logger.Log(0,0,0,ID,Action.CONSTRUCTOR_STOPPED);
     }
-    private void sleep(){
-        Random random = new Random(System.currentTimeMillis());
-        DoubleStream stream;
-        stream = random.doubles(1, interval - interval * 0.01, interval + interval * 0.02);
-        try {
-            Thread.sleep((long) stream.findFirst().getAsDouble());
-        }
-        catch(InterruptedException e){
-            Thread.currentThread().interrupt();
-        }
-    }
+
     private void WaitCanProduce(){
         lock.lock();
         try{
             if(ingotType ==1){
                 while(counter < 1){
-                    didNotArrive.await();
+                    canProduce.await();
                 }
             }
             else{
                 while(counter < 2)
-                    didNotArrive.await();
+                    canProduce.await();
             }
         }
         catch (InterruptedException e){
@@ -76,7 +61,15 @@ public class Constructor implements Runnable{
         }
     }
     private void ConstructorProduced(){
-
+        lock.lock();
+        try{
+            if(ingotType ==1) counter--;
+            else counter -= 2;
+            isFull.signalAll();
+        }
+        finally{
+            lock.unlock();
+        }
     }
     public static Constructor getInstance(int ID){
         return instances.get(ID-1);
@@ -92,6 +85,9 @@ public class Constructor implements Runnable{
     public Condition getisFull(){
         return isFull;
     }
+    public Condition getCanProduce(){
+        return canProduce;
+    }
     public int getCounter(){
         return counter;
     }
@@ -101,5 +97,27 @@ public class Constructor implements Runnable{
     public int getCapacity(){
         return capacity;
     }
+    private boolean activeTransporters(){
+        ArrayList<Transporter> list = Transporter.getList();
+        for(Transporter t : list){
+            if(t.getTargetConstructorID() == ID){
+                if(!t.isDead){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private boolean checkRawCount(){
+        if(ingotType == 1){
+            if(counter ==0) return false;
+            else return true;
+        }
+        else{
+            if(counter <2) return false;
+            else return true;
+        }
+    }
+
 
 }

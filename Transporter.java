@@ -1,40 +1,53 @@
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.DoubleStream;
 
-public class Transporter implements Runnable{
+public class Transporter extends Agent{
+    private static final ArrayList<Transporter> instances = new ArrayList<>();
+
     private final int ID;
-    private final int travelTime;
     private final int minerID;
     private final int sourceSmelterID;
     private final int targetSmelterID;
     private final int targetConstructorID;
-    private final HW2Logger logger;
+    private boolean nothingToCarry ;
+
 
     public Transporter(int ID, int travelTime, int minerID, int sourceSmelterID, int targetSmelterID, int targetConstructorID,HW2Logger logger) {
         this.ID = ID;
-        this.travelTime = travelTime;
+        this.interval = travelTime;
         this.minerID = minerID;
         this.sourceSmelterID = sourceSmelterID;
         this.targetSmelterID = targetSmelterID;
         this.targetConstructorID = targetConstructorID;
         this.logger = logger;
+        isDead = false;
+        nothingToCarry = false;
     }
 
     @Override
     public void run() {
         logger.Log(0,0,ID,0,Action.TRANSPORTER_CREATED);
-        if(minerID != 0) logger.Log(minerID,0,ID,0,Action.TRANSPORTER_GO);
-        else logger.Log(0,sourceSmelterID,ID,0,Action.TRANSPORTER_GO);
-        
-        while(/*The source has ingots or is active*/){
+        Agent source;
+        if(minerID != 0){
+            logger.Log(minerID,0,ID,0,Action.TRANSPORTER_GO);
+             source = Miner.getInstance(minerID);
+        }
+
+        else {
+            logger.Log(0, sourceSmelterID, ID, 0, Action.TRANSPORTER_GO);
+             source  = Smelter.getInstance(sourceSmelterID);
+        }
+        while(source.counter > 0  || !source.isDead){
             sleep();
             if(minerID != 0)
                 logger.Log(minerID,0,ID,0,Action.TRANSPORTER_ARRIVE);
             else
                 logger.Log(0,sourceSmelterID,ID,0,Action.TRANSPORTER_ARRIVE);
             WaitNextLoad();
+            if(nothingToCarry) break;
             if(minerID != 0)
                 logger.Log(minerID,0,ID,0,Action.TRANSPORTER_TAKE);
             else
@@ -79,30 +92,26 @@ public class Transporter implements Runnable{
                 logger.Log(0,sourceSmelterID,ID,targetConstructorID,Action.TRANSPORTER_GO);
 
         }
+        isDead = true;
         logger.Log(0,0,ID,0,Action.TRANSPORTER_STOPPED);
     }
 
-    private void sleep(){
-        Random random = new Random(System.currentTimeMillis());
-        DoubleStream stream;
-        stream = random.doubles(1, travelTime - travelTime * 0.01, travelTime + travelTime * 0.01);
-        try {
-            Thread.sleep((long) stream.findFirst().getAsDouble());
-        }
-        catch(InterruptedException e){
-            Thread.currentThread().interrupt();
-        }
-    }
+
     private void WaitNextLoad(){
+
         if(minerID != 0){
             Miner miner = Miner.getInstance(minerID);
             Lock lock = miner.getLock();
             Condition isEmpty = miner.getIsEmpty();
-
+            lock.lock();
             try{
-                lock.lock();
-                int counter = miner.getCounter();
-                while(counter  == 0){
+
+
+                while(miner.getCounter()  == 0 ){
+                    if(miner.isDead){
+                        nothingToCarry = true;
+                        break;
+                    }
                     isEmpty.await();
                 }
             }
@@ -111,6 +120,7 @@ public class Transporter implements Runnable{
 
             }
             finally{
+                if(miner.getCounter() !=0)
                 miner.incrementCounter(-1);
                 lock.unlock();
             }
@@ -119,10 +129,15 @@ public class Transporter implements Runnable{
             Smelter smelter = Smelter.getInstance(sourceSmelterID);
             Lock lock = smelter.getLock();
             Condition isEmpty = smelter.getIsEmpty();
+            lock.lock();
             try{
-                lock.lock();
-                int counter = smelter.getIngotCounter();
-                while(counter == 0){
+
+
+                while(smelter.getIngotCounter()== 0){
+                    if(smelter.isDead){
+                        nothingToCarry = true;
+                        break;
+                    }
                     isEmpty.await();
                 }
             }
@@ -131,6 +146,7 @@ public class Transporter implements Runnable{
 
             }
             finally{
+                if(smelter.getIngotCounter() !=0)
                 smelter.incrementIngotCounter(-1);
                 lock.unlock();
             }
@@ -139,15 +155,15 @@ public class Transporter implements Runnable{
     }
     private void WaitUnLoad(){
         if(targetConstructorID != 0){
-            Constructor constructor = Constructor.getInstance(minerID);
+            Constructor constructor = Constructor.getInstance(targetConstructorID);
             Lock lock = constructor.getLock();
             Condition isFull = constructor.getisFull();
-
+            lock.lock();
             try{
-                lock.lock();
-                int counter = constructor.getCounter();
+
+
                 int capacity = constructor.getCapacity();
-                while(counter >= capacity){
+                while(constructor.getCounter() >= capacity){
                     isFull.await();
                 }
             }
@@ -164,11 +180,12 @@ public class Transporter implements Runnable{
             Smelter smelter = Smelter.getInstance(targetSmelterID);
             Lock lock = smelter.getLock();
             Condition isFull = smelter.getIsFull();
+            lock.lock();
             try{
-                lock.lock();
-                int counter = smelter.getIngotCounter();
+
+
                 int capacity = smelter.getOreCapacity();
-                while(counter>= capacity ){
+                while(smelter.getOreCounter()>= capacity ){
                     isFull.await();
                 }
             }
@@ -183,25 +200,52 @@ public class Transporter implements Runnable{
 
         }
     }
+
     private void Loaded(){
         if(minerID !=0){
             Miner miner = Miner.getInstance(minerID);
+            miner.getLock().lock();
             miner.getIsFull().signal();
+            miner.getLock().unlock();
         }
         else{
             // Buraya bakicam
             Smelter smelter = Smelter.getInstance(sourceSmelterID);
-            smelter.getIsFull().signal();
+            smelter.getLock().lock();
+            smelter.getCanProduce().signal();
+            smelter.getLock().unlock();
         }
     }
     private void Unloaded(){
         if(targetSmelterID !=0){
             Smelter smelter = Smelter.getInstance(targetSmelterID);
-            smelter.getIsFull().signal();
+            smelter.getLock().lock();
+            smelter.getCanProduce().signal();
+            smelter.getLock().unlock();
         }
         else{
             Constructor constructor = Constructor.getInstance(targetConstructorID);
-            constructor.getisFull().signal();
+            constructor.getLock().lock();
+            constructor.getCanProduce().signal();
+            constructor.getLock().unlock();
         }
     }
+
+    public static ArrayList<Transporter> getList(){
+        return instances;
+    }
+    public static void addInstance(Transporter transporter) {
+        instances.add(transporter);
+    }
+
+    public int getTargetSmelterID() {
+        return targetSmelterID;
+    }
+
+    public int getTargetConstructorID() {
+        return targetConstructorID;
+    }
 }
+
+
+
